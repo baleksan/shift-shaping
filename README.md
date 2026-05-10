@@ -1,5 +1,9 @@
 # Shift-Shaping
 
+<p align="center">
+  <img src="wolfie.svg" width="200" alt="Wolfie — the Shift-Shaping mascot" />
+</p>
+
 > *Werewolves shape-shift. We shape software. And just like the full moon comes around fast, we ship even faster.*
 
 We named this project **Shift-Shaping** because great products aren't born — they're *shaped*. Like a werewolf under a full moon, the best ideas transform rapidly from rough sketches into something powerful, alive, and ready to run. The full moon cycle is 29.5 days. We aim to beat that.
