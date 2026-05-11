@@ -10,6 +10,8 @@
 
 We named this project **Shift-Shaping** because great products aren't born — they're *shaped*. Like a werewolf under a full moon, the best ideas transform rapidly from rough sketches into something powerful, alive, and ready to run. The full moon cycle is 29.5 days. We aim to beat that.
 
+This project is inspired by Basecamp's [**Shape Up**](https://basecamp.com/shapeup/0.3-chapter-01#shaping-the-work) methodology — a product development approach where work is *shaped* before it's built. Instead of writing detailed specs or throwing vague ideas over the wall, shaping means defining the key elements of a solution at the right level of abstraction: concrete enough to be actionable, abstract enough to leave room for the builders to work out the details. Shapes have a fixed **appetite** (time budget), a clear **problem** statement, and a rough **solution** sketch — but deliberately leave out pixel-perfect mockups. The result: teams that ship confidently within cycles, not sprints that drag on forever.
+
 ---
 
 ## Meet the Mascots
@@ -74,7 +76,7 @@ REACT_APP_LLM_API_KEY=sk-your-key-here
 
 ## shapie/
 
-A **Shape Up management tool** for creating, refining, and shipping product shapes — the structured pitches that drive development cycles.
+A **Shape Up management tool** for creating, refining, and shipping product shapes — the structured pitches that drive development cycles. Built around the concepts from Basecamp's [Shape Up](https://basecamp.com/shapeup/0.3-chapter-01#shaping-the-work): fixed appetite, problem framing, solution sketching, rabbit-hole identification, and no-gos.
 
 <p align="center">
   <img src="shapie.svg" width="120" alt="Shapie" />
