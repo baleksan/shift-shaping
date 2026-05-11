@@ -2024,6 +2024,7 @@ body {
   border: 1px solid #e8e6e1;
   border-radius: 10px;
   overflow: hidden;
+  position: relative;
 }
 
 .report-recording-video {
@@ -2056,17 +2057,28 @@ body {
 }
 
 .report-recording-delete {
-  background: none;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.55);
   border: none;
   cursor: pointer;
-  color: #ccc;
-  padding: 2px;
+  color: #fff;
+  padding: 5px;
+  border-radius: 6px;
   line-height: 1;
-  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  z-index: 2;
+}
+
+.report-recording-card:hover .report-recording-delete {
+  opacity: 1;
 }
 
 .report-recording-delete:hover {
-  color: #ef4444;
+  background: #ef4444;
+  color: #fff;
 }
 
 /* ----------------------------------------------------------------

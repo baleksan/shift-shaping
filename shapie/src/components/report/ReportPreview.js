@@ -273,15 +273,19 @@ export default function ReportPreview({ shape, config, onUpdateShape }) {
             <div className="report-recordings-list">
               {recordings.map((rec) => (
                 <div key={rec.filename} className="report-recording-card">
+                  <button
+                    className="report-recording-delete"
+                    onClick={() => deleteRecording(rec.filename)}
+                    title="Delete recording"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+                    </svg>
+                  </button>
                   <video className="report-recording-video" src={rec.url} controls preload="metadata" />
                   <div className="report-recording-info">
                     <span className="report-recording-name">{rec.filename}</span>
                     <span className="report-recording-size">{(rec.size / (1024 * 1024)).toFixed(1)} MB</span>
-                    <button className="report-recording-delete" onClick={() => deleteRecording(rec.filename)} title="Delete recording">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
-                      </svg>
-                    </button>
                   </div>
                 </div>
               ))}
@@ -372,6 +376,17 @@ export default function ReportPreview({ shape, config, onUpdateShape }) {
           <div className="report-recordings-list">
             {recordings.map((rec) => (
               <div key={rec.filename} className="report-recording-card">
+                <button
+                  className="report-recording-delete"
+                  onClick={() => deleteRecording(rec.filename)}
+                  title="Delete recording"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                    <path d="M10 11v6" /><path d="M14 11v6" />
+                  </svg>
+                </button>
                 <video
                   className="report-recording-video"
                   src={rec.url}
@@ -383,17 +398,6 @@ export default function ReportPreview({ shape, config, onUpdateShape }) {
                   <span className="report-recording-size">
                     {(rec.size / (1024 * 1024)).toFixed(1)} MB
                   </span>
-                  <button
-                    className="report-recording-delete"
-                    onClick={() => deleteRecording(rec.filename)}
-                    title="Delete recording"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-                      <path d="M10 11v6" /><path d="M14 11v6" />
-                    </svg>
-                  </button>
                 </div>
               </div>
             ))}
