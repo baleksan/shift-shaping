@@ -6,7 +6,7 @@ export default function ProductDetails({ product, onAddToCart }) {
     const initial = {};
     if (product.variants) {
       product.variants.forEach((variant) => {
-        if (variant.options.length > 0) {
+        if (variant.options && variant.options.length > 0) {
           initial[variant.id] = variant.options[0].value;
         }
       });
@@ -107,7 +107,7 @@ export default function ProductDetails({ product, onAddToCart }) {
         {/* Variants */}
         {product.variants && product.variants.length > 0 && (
           <div className="pdp-variants">
-            {product.variants.map((variant) => (
+            {product.variants.filter((v) => v.options && v.options.length > 0).map((variant) => (
               <div key={variant.id} className="variant-group">
                 <div className="variant-label">
                   <span>{variant.label}:</span>
