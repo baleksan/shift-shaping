@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head><title>Shapie Bridge</title></head>
+<body>
+<script>
+/**
+ * Shapie Bridge — reads Wolfie's localStorage config and sends it
+ * to the Shapie origin via postMessage.
+ *
+ * This file lives in Wolfie's public/ dir so it's served on Wolfie's
+ * origin, giving it access to Wolfie's localStorage.
+ */
+(function () {
+  var STORAGE_KEY = 'shopperAgentConfig';
+  var config = null;
+
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      config = JSON.parse(raw);
+    }
+  } catch (e) {
+    // Couldn't read — will send null
+  }
+
+  // Send to whoever opened us (Shapie's iframe)
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({
+      type: 'wolfie-config',
+      config: config
+    }, '*');
+  }
+})();
+</script>
+</body>
+</html>

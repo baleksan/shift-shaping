@@ -59,6 +59,26 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Apply persisted UI customizations on mount
+  useEffect(() => {
+    if (config.uiCustomizations && typeof config.uiCustomizations === 'object') {
+      const root = document.documentElement;
+      for (const [varName, value] of Object.entries(config.uiCustomizations)) {
+        root.style.setProperty(varName, value);
+      }
+    }
+    if (config.uiCustomCSS) {
+      const DYNAMIC_STYLE_ID = 'wolfie-ui-customizations';
+      let styleEl = document.getElementById(DYNAMIC_STYLE_ID);
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = DYNAMIC_STYLE_ID;
+        document.head.appendChild(styleEl);
+      }
+      styleEl.textContent = config.uiCustomCSS;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Persist config
   const handleConfigChange = (newConfig) => {
     setConfig(newConfig);
