@@ -132,9 +132,10 @@ function resetCSSVariables() {
 // ----------------------------------------------------------------
 
 const DYNAMIC_STYLE_ID = 'wolfie-ui-customizations';
+const GENERATED_STYLE_ID = 'wolfie-ui-generated';
 
 /**
- * Inject (or replace) a dynamic <style> block with custom CSS rules.
+ * Inject (or replace) a dynamic <style> block with custom CSS rules (tweaks).
  */
 function applyCustomCSS(cssText) {
   let styleEl = document.getElementById(DYNAMIC_STYLE_ID);
@@ -147,11 +148,57 @@ function applyCustomCSS(cssText) {
 }
 
 /**
- * Remove the dynamic <style> block entirely.
+ * Remove the tweak <style> block entirely.
  */
 function removeCustomCSS() {
   const styleEl = document.getElementById(DYNAMIC_STYLE_ID);
   if (styleEl) styleEl.remove();
+}
+
+/**
+ * Inject (or replace) a generated full-UI <style> block.
+ */
+function applyGeneratedCSS(cssText) {
+  let styleEl = document.getElementById(GENERATED_STYLE_ID);
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = GENERATED_STYLE_ID;
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = cssText;
+}
+
+/**
+ * Remove the generated full-UI <style> block.
+ */
+function removeGeneratedCSS() {
+  const styleEl = document.getElementById(GENERATED_STYLE_ID);
+  if (styleEl) styleEl.remove();
+}
+
+/**
+ * Activate a UI mode: "original", "tweaked", or "generated".
+ * Only the CSS for the active mode is applied in the DOM.
+ */
+function activateMode(mode, cfg) {
+  // Always clean up everything first
+  resetCSSVariables();
+  removeCustomCSS();
+  removeGeneratedCSS();
+
+  if (mode === 'tweaked') {
+    if (cfg.uiCustomizations && Object.keys(cfg.uiCustomizations).length > 0) {
+      applyCSSVariables(cfg.uiCustomizations);
+    }
+    if (cfg.uiCustomCSS) {
+      applyCustomCSS(cfg.uiCustomCSS);
+    }
+  } else if (mode === 'generated') {
+    if (cfg.uiGeneratedCSS) {
+      applyGeneratedCSS(cfg.uiGeneratedCSS);
+    }
+  }
+  // "original" — everything already cleaned up
 }
 
 /**
@@ -253,6 +300,101 @@ async function callUIChangeLLM(userRequest, currentVars, existingCustomCSS, llmC
 }
 
 /**
+ * Build the system prompt for generating a completely new UI.
+ */
+function buildUICreatePrompt(userRequest, existingGeneratedCSS) {
+  const varList = Object.entries(CSS_VARIABLE_DEFINITIONS)
+    .map(([name, def]) => `  ${name}: ${def.default}  /* ${def.label} */`)
+    .join('\n');
+
+  const existingSection = existingGeneratedCSS
+    ? `\nThe user previously generated this custom UI. They want to refine it. Here is the current generated stylesheet:\n\`\`\`css\n${existingGeneratedCSS}\n\`\`\`\nApply their requested changes and return the COMPLETE updated stylesheet.\n`
+    : '';
+
+  return `You are a creative UI designer. The user wants you to generate a COMPLETELY NEW visual design for a chat-widget-style shopping app called "Wolfie".
+
+You must produce a comprehensive CSS stylesheet that completely transforms the UI appearance. This is NOT a small tweak — you are redesigning the entire look and feel.
+
+Default CSS custom properties (override any of these in a :root block at the top of your stylesheet):
+${varList}
+
+${CSS_CLASS_REFERENCE}
+${existingSection}
+The user's design request: "${userRequest}"
+
+Your job: Generate a COMPLETE CSS stylesheet that:
+1. Starts with a \`:root { ... }\` block overriding CSS custom properties for the new theme
+2. Includes rules for ALL major UI sections: header, messages, product cards, input area, cart, buttons
+3. Transforms colors, typography, spacing, shadows, borders, and any animations/transitions
+4. Ensures text remains readable (good contrast ratios)
+5. Maintains usability — buttons are clickable, text is legible, layout is functional
+6. Is creative and ambitious — make it look genuinely different from the default
+
+Return ONLY a JSON object (no markdown fences):
+{"css": "...the complete CSS stylesheet...", "name": "Short Theme Name", "summary": "1-2 sentence description of the design"}
+
+Keep the CSS under 5000 characters. Be comprehensive but concise — use shorthand properties where possible.`;
+}
+
+/**
+ * Call the LLM to generate a complete new UI stylesheet.
+ */
+async function callUICreateLLM(userRequest, existingGeneratedCSS, llmConfig) {
+  const { apiKey, apiUrl = DEFAULT_LLM_GATEWAY, model = DEFAULT_LLM_MODEL } = llmConfig;
+
+  if (!apiKey) {
+    throw new Error('Please configure an LLM API key in the LLM tab first.');
+  }
+
+  const prompt = buildUICreatePrompt(userRequest, existingGeneratedCSS);
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8,
+      max_tokens: 4000,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`LLM error (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content?.trim() || '';
+
+  // Parse JSON (handle potential markdown fences)
+  let jsonStr = content;
+  const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim();
+
+  const parsed = JSON.parse(jsonStr);
+  if (!parsed.css) {
+    throw new Error('LLM did not return a "css" stylesheet.');
+  }
+
+  // Basic validation: check for unbalanced braces
+  const opens = (parsed.css.match(/\{/g) || []).length;
+  const closes = (parsed.css.match(/\}/g) || []).length;
+  if (opens !== closes) {
+    throw new Error('Generated CSS appears truncated (unbalanced braces). Try a simpler design request.');
+  }
+
+  return {
+    css: parsed.css,
+    name: parsed.name || 'Custom Theme',
+    summary: parsed.summary || 'New UI applied!',
+  };
+}
+
+/**
  * PromptSettings — a slide-out panel that lets users customize:
  *   1. Search API configuration (provider, API key)
  *   2. LLM configuration (API key, model, endpoint)
@@ -265,7 +407,20 @@ export default function PromptSettings({ config, onConfigChange, onClose }) {
   const [draftText, setDraftText] = useState('');
   const [validationError, setValidationError] = useState(null);
 
-  // --- Change UI state ---
+  // --- UI mode ---
+  // "original" | "tweaked" | "generated"
+  const inferMode = () => {
+    if (config.uiMode) return config.uiMode;
+    if (config.uiGeneratedCSS) return 'generated';
+    if ((config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0) || config.uiCustomCSS) return 'tweaked';
+    return 'original';
+  };
+  const [uiMode, setUiMode] = useState(inferMode);
+
+  // Sub-view within the Change UI tab: "tweak" or "create"
+  const [uiSubView, setUiSubView] = useState(uiMode === 'generated' ? 'create' : 'tweak');
+
+  // --- Change UI (tweak) state ---
   const [uiChatMessages, setUiChatMessages] = useState([
     {
       role: 'assistant',
@@ -276,19 +431,37 @@ export default function PromptSettings({ config, onConfigChange, onClose }) {
   const [uiChatLoading, setUiChatLoading] = useState(false);
   const uiChatEndRef = useRef(null);
 
+  // --- Create New UI state ---
+  const [uiCreateMessages, setUiCreateMessages] = useState([
+    {
+      role: 'assistant',
+      content: "I'll create a completely new UI design for you! Describe the look and feel you're going for. Be creative:\n\n- \"Cyberpunk neon with dark background and glowing accents\"\n- \"Soft pastel minimalist with rounded everything\"\n- \"Retro 90s vaporwave aesthetic\"\n- \"Premium luxury dark theme like a high-end fashion site\"",
+    },
+  ]);
+  const [uiCreateInput, setUiCreateInput] = useState('');
+  const [uiCreateLoading, setUiCreateLoading] = useState(false);
+  const uiCreateEndRef = useRef(null);
+
   useEffect(() => {
     uiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [uiChatMessages]);
 
-  // Apply saved UI customizations on mount
   useEffect(() => {
-    if (config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0) {
-      applyCSSVariables(config.uiCustomizations);
-    }
-    if (config.uiCustomCSS) {
-      applyCustomCSS(config.uiCustomCSS);
-    }
+    uiCreateEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [uiCreateMessages]);
+
+  // Apply saved UI on mount based on mode
+  useEffect(() => {
+    const mode = inferMode();
+    activateMode(mode, config);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Switch UI mode
+  const handleModeChange = useCallback((mode) => {
+    setUiMode(mode);
+    activateMode(mode, config);
+    onConfigChange({ ...config, uiMode: mode });
+  }, [config, onConfigChange]);
 
   const handleUIChangeRequest = useCallback(async () => {
     const text = uiChatInput.trim();
@@ -320,13 +493,18 @@ export default function PromptSettings({ config, onConfigChange, onClose }) {
         applyCustomCSS(newCustomCSS);
       }
 
-      // Merge into persisted config
+      // Merge into persisted config and switch to tweaked mode
       const newCustomizations = { ...(config.uiCustomizations || {}), ...result.changes };
-      onConfigChange({
+      // Deactivate generated CSS when applying tweaks
+      removeGeneratedCSS();
+      const newConfig = {
         ...config,
         uiCustomizations: newCustomizations,
         uiCustomCSS: newCustomCSS,
-      });
+        uiMode: 'tweaked',
+      };
+      onConfigChange(newConfig);
+      setUiMode('tweaked');
 
       // Show what changed
       const detailParts = [];
@@ -361,14 +539,77 @@ export default function PromptSettings({ config, onConfigChange, onClose }) {
   }, [uiChatInput, uiChatLoading, config, onConfigChange]);
 
   const handleUIReset = useCallback(() => {
-    resetCSSVariables();
-    removeCustomCSS();
-    onConfigChange({ ...config, uiCustomizations: {}, uiCustomCSS: '' });
+    activateMode('original', config);
+    setUiMode('original');
+    onConfigChange({
+      ...config,
+      uiCustomizations: {},
+      uiCustomCSS: '',
+      uiGeneratedCSS: '',
+      uiGeneratedName: '',
+      uiMode: 'original',
+    });
     setUiChatMessages((prev) => [
       ...prev,
       { role: 'assistant', content: 'UI reset to defaults. All customizations have been removed.' },
     ]);
+    setUiCreateMessages((prev) => [
+      ...prev,
+      { role: 'assistant', content: 'Custom UI removed. Back to the original look.' },
+    ]);
   }, [config, onConfigChange]);
+
+  // --- Create New UI handler ---
+  const handleUICreateRequest = useCallback(async () => {
+    const text = uiCreateInput.trim();
+    if (!text || uiCreateLoading) return;
+
+    setUiCreateInput('');
+    setUiCreateMessages((prev) => [...prev, { role: 'user', content: text }]);
+    setUiCreateLoading(true);
+
+    try {
+      const existingGeneratedCSS = config.uiGeneratedCSS || '';
+      const llmConfig = {
+        apiKey: config.llmApiKey,
+        apiUrl: config.llmApiUrl || undefined,
+        model: config.llmModel || DEFAULT_LLM_MODEL,
+      };
+
+      const result = await callUICreateLLM(text, existingGeneratedCSS, llmConfig);
+
+      // Deactivate tweaks, apply generated CSS
+      resetCSSVariables();
+      removeCustomCSS();
+      applyGeneratedCSS(result.css);
+
+      // Persist
+      const newConfig = {
+        ...config,
+        uiGeneratedCSS: result.css,
+        uiGeneratedName: result.name,
+        uiMode: 'generated',
+      };
+      onConfigChange(newConfig);
+      setUiMode('generated');
+
+      setUiCreateMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `**${result.name}** — ${result.summary}`,
+          details: result.css,
+        },
+      ]);
+    } catch (err) {
+      setUiCreateMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `Oops! ${err.message}`, isError: true },
+      ]);
+    } finally {
+      setUiCreateLoading(false);
+    }
+  }, [uiCreateInput, uiCreateLoading, config, onConfigChange]);
 
   const tabs = [
     { id: 'prompts', label: 'Prompts' },
@@ -659,115 +900,260 @@ export default function PromptSettings({ config, onConfigChange, onClose }) {
           {/* --- CHANGE UI TAB --- */}
           {activeTab === 'changeUI' && (
             <div className="settings-section ui-change-section">
-              <p className="settings-description">
-                Describe how you'd like the UI to look. The LLM will adjust colors, typography, and spacing in real time.
-                {!config.llmApiKey && (
-                  <span className="ui-change-warning"> Requires an LLM API key (set in the LLM tab).</span>
-                )}
-              </p>
+              {/* Sub-view switcher */}
+              <div className="ui-subview-switcher">
+                <button
+                  className={`ui-subview-btn ${uiSubView === 'tweak' ? 'active' : ''}`}
+                  onClick={() => setUiSubView('tweak')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                  Tweak UI
+                </button>
+                <button
+                  className={`ui-subview-btn ${uiSubView === 'create' ? 'active' : ''}`}
+                  onClick={() => setUiSubView('create')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                  Create New UI
+                </button>
+              </div>
 
-              {/* Chat messages */}
-              <div className="ui-chat-messages">
-                {uiChatMessages.map((msg, idx) => (
-                  <div key={idx} className={`ui-chat-msg ui-chat-msg--${msg.role} ${msg.isError ? 'ui-chat-msg--error' : ''}`}>
-                    {msg.role === 'assistant' && (
-                      <div className="ui-chat-avatar">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                          <path d="M2 17l10 5 10-5"/>
-                          <path d="M2 12l10 5 10-5"/>
-                        </svg>
+              {/* Mode indicator bar */}
+              <div className="ui-mode-bar">
+                <span className="ui-mode-bar-label">Active:</span>
+                <button
+                  className={`ui-mode-btn ${uiMode === 'original' ? 'active' : ''}`}
+                  onClick={() => handleModeChange('original')}
+                >
+                  Original
+                </button>
+                <button
+                  className={`ui-mode-btn ${uiMode === 'tweaked' ? 'active' : ''}`}
+                  onClick={() => handleModeChange('tweaked')}
+                  disabled={!(config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0) && !config.uiCustomCSS}
+                >
+                  Tweaked
+                </button>
+                <button
+                  className={`ui-mode-btn ${uiMode === 'generated' ? 'active' : ''}`}
+                  onClick={() => handleModeChange('generated')}
+                  disabled={!config.uiGeneratedCSS}
+                >
+                  {config.uiGeneratedName || 'Custom UI'}
+                </button>
+              </div>
+
+              {!config.llmApiKey && (
+                <p className="settings-description">
+                  <span className="ui-change-warning">Requires an LLM API key (set in the LLM tab).</span>
+                </p>
+              )}
+
+              {/* ---- TWEAK sub-view ---- */}
+              {uiSubView === 'tweak' && (
+                <>
+                  <p className="settings-description" style={{ margin: '0 0 4px' }}>
+                    Describe small changes — colors, fonts, spacing. Changes are applied incrementally.
+                  </p>
+
+                  {/* Chat messages */}
+                  <div className="ui-chat-messages">
+                    {uiChatMessages.map((msg, idx) => (
+                      <div key={idx} className={`ui-chat-msg ui-chat-msg--${msg.role} ${msg.isError ? 'ui-chat-msg--error' : ''}`}>
+                        {msg.role === 'assistant' && (
+                          <div className="ui-chat-avatar">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                              <path d="M2 17l10 5 10-5"/>
+                              <path d="M2 12l10 5 10-5"/>
+                            </svg>
+                          </div>
+                        )}
+                        <div className="ui-chat-bubble">
+                          <div className="ui-chat-text">{msg.content}</div>
+                          {msg.details && (
+                            <details className="ui-chat-details">
+                              <summary>Changes applied</summary>
+                              <pre>{msg.details}</pre>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {uiChatLoading && (
+                      <div className="ui-chat-msg ui-chat-msg--assistant">
+                        <div className="ui-chat-avatar">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                          </svg>
+                        </div>
+                        <div className="ui-chat-bubble">
+                          <div className="ui-chat-typing">
+                            <span /><span /><span />
+                          </div>
+                        </div>
                       </div>
                     )}
-                    <div className="ui-chat-bubble">
-                      <div className="ui-chat-text">{msg.content}</div>
-                      {msg.details && (
-                        <details className="ui-chat-details">
-                          <summary>Changes applied</summary>
-                          <pre>{msg.details}</pre>
+                    <div ref={uiChatEndRef} />
+                  </div>
+
+                  {/* Chat input */}
+                  <div className="ui-chat-input-row">
+                    <input
+                      type="text"
+                      className="ui-chat-input"
+                      placeholder={config.llmApiKey ? 'Describe a UI change...' : 'Set LLM API key first...'}
+                      value={uiChatInput}
+                      onChange={(e) => setUiChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleUIChangeRequest();
+                        }
+                      }}
+                      disabled={!config.llmApiKey || uiChatLoading}
+                    />
+                    <button
+                      className="ui-chat-send"
+                      onClick={handleUIChangeRequest}
+                      disabled={!config.llmApiKey || !uiChatInput.trim() || uiChatLoading}
+                      title="Send"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Current overrides preview */}
+                  {((config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0) || config.uiCustomCSS) && (
+                    <div className="ui-overrides-preview">
+                      <h4>Active customizations</h4>
+                      {config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0 && (
+                        <div className="ui-overrides-grid">
+                          {Object.entries(config.uiCustomizations).map(([varName, value]) => (
+                            <div key={varName} className="ui-override-chip">
+                              {value.startsWith('#') && (
+                                <span className="ui-override-swatch" style={{ background: value }} />
+                              )}
+                              <span className="ui-override-name">{CSS_VARIABLE_DEFINITIONS[varName]?.label || varName}</span>
+                              <span className="ui-override-value">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {config.uiCustomCSS && (
+                        <details className="ui-css-rules-preview">
+                          <summary>Custom CSS rules</summary>
+                          <pre>{config.uiCustomCSS}</pre>
                         </details>
                       )}
                     </div>
-                  </div>
-                ))}
-                {uiChatLoading && (
-                  <div className="ui-chat-msg ui-chat-msg--assistant">
-                    <div className="ui-chat-avatar">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                        <path d="M2 17l10 5 10-5"/>
-                        <path d="M2 12l10 5 10-5"/>
-                      </svg>
-                    </div>
-                    <div className="ui-chat-bubble">
-                      <div className="ui-chat-typing">
-                        <span /><span /><span />
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={uiChatEndRef} />
-              </div>
-
-              {/* Chat input */}
-              <div className="ui-chat-input-row">
-                <input
-                  type="text"
-                  className="ui-chat-input"
-                  placeholder={config.llmApiKey ? 'Describe a UI change...' : 'Set LLM API key first...'}
-                  value={uiChatInput}
-                  onChange={(e) => setUiChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleUIChangeRequest();
-                    }
-                  }}
-                  disabled={!config.llmApiKey || uiChatLoading}
-                />
-                <button
-                  className="ui-chat-send"
-                  onClick={handleUIChangeRequest}
-                  disabled={!config.llmApiKey || !uiChatInput.trim() || uiChatLoading}
-                  title="Send"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              </div>
-
-              {/* Reset button */}
-              {((config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0) || config.uiCustomCSS) && (
-                <button className="ui-reset-button" onClick={handleUIReset}>
-                  Reset UI to Defaults
-                </button>
+                  )}
+                </>
               )}
 
-              {/* Current overrides preview */}
-              {((config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0) || config.uiCustomCSS) && (
-                <div className="ui-overrides-preview">
-                  <h4>Active customizations</h4>
-                  {config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0 && (
-                    <div className="ui-overrides-grid">
-                      {Object.entries(config.uiCustomizations).map(([varName, value]) => (
-                        <div key={varName} className="ui-override-chip">
-                          {value.startsWith('#') && (
-                            <span className="ui-override-swatch" style={{ background: value }} />
+              {/* ---- CREATE NEW UI sub-view ---- */}
+              {uiSubView === 'create' && (
+                <>
+                  <p className="settings-description" style={{ margin: '0 0 4px' }}>
+                    Describe a completely new look. The LLM will generate a full stylesheet.
+                    {config.uiGeneratedName && (
+                      <span className="ui-generated-badge">{config.uiGeneratedName}</span>
+                    )}
+                  </p>
+
+                  {/* Chat messages */}
+                  <div className="ui-chat-messages">
+                    {uiCreateMessages.map((msg, idx) => (
+                      <div key={idx} className={`ui-chat-msg ui-chat-msg--${msg.role} ${msg.isError ? 'ui-chat-msg--error' : ''}`}>
+                        {msg.role === 'assistant' && (
+                          <div className="ui-chat-avatar ui-chat-avatar--create">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="ui-chat-bubble">
+                          <div className="ui-chat-text">{msg.content}</div>
+                          {msg.details && (
+                            <details className="ui-chat-details">
+                              <summary>Generated stylesheet</summary>
+                              <pre>{msg.details}</pre>
+                            </details>
                           )}
-                          <span className="ui-override-name">{CSS_VARIABLE_DEFINITIONS[varName]?.label || varName}</span>
-                          <span className="ui-override-value">{value}</span>
                         </div>
-                      ))}
+                      </div>
+                    ))}
+                    {uiCreateLoading && (
+                      <div className="ui-chat-msg ui-chat-msg--assistant">
+                        <div className="ui-chat-avatar ui-chat-avatar--create">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                        </div>
+                        <div className="ui-chat-bubble">
+                          <div className="ui-chat-typing">
+                            <span /><span /><span />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={uiCreateEndRef} />
+                  </div>
+
+                  {/* Chat input */}
+                  <div className="ui-chat-input-row">
+                    <input
+                      type="text"
+                      className="ui-chat-input"
+                      placeholder={config.llmApiKey ? 'Describe your new UI design...' : 'Set LLM API key first...'}
+                      value={uiCreateInput}
+                      onChange={(e) => setUiCreateInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleUICreateRequest();
+                        }
+                      }}
+                      disabled={!config.llmApiKey || uiCreateLoading}
+                    />
+                    <button
+                      className="ui-chat-send"
+                      onClick={handleUICreateRequest}
+                      disabled={!config.llmApiKey || !uiCreateInput.trim() || uiCreateLoading}
+                      title="Send"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Generated CSS preview */}
+                  {config.uiGeneratedCSS && (
+                    <div className="ui-overrides-preview">
+                      <h4>Generated theme: {config.uiGeneratedName || 'Custom UI'}</h4>
+                      <details className="ui-css-rules-preview">
+                        <summary>Full generated stylesheet ({(config.uiGeneratedCSS.match(/\{/g) || []).length} rules)</summary>
+                        <pre>{config.uiGeneratedCSS}</pre>
+                      </details>
                     </div>
                   )}
-                  {config.uiCustomCSS && (
-                    <details className="ui-css-rules-preview">
-                      <summary>Custom CSS rules</summary>
-                      <pre>{config.uiCustomCSS}</pre>
-                    </details>
-                  )}
-                </div>
+                </>
+              )}
+
+              {/* Reset button — shown for any mode that has customizations */}
+              {(uiMode !== 'original' || config.uiGeneratedCSS || (config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0) || config.uiCustomCSS) && (
+                <button className="ui-reset-button" onClick={handleUIReset}>
+                  Reset All to Defaults
+                </button>
               )}
             </div>
           )}

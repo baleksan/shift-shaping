@@ -1928,6 +1928,112 @@ body {
   font-size: 0.7rem;
 }
 
+/* Sub-view switcher (Tweak UI | Create New UI) */
+.ui-subview-switcher {
+  display: flex;
+  gap: 2px;
+  background: #f0f0f0;
+  border-radius: var(--radius-md);
+  padding: 2px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.ui-subview-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--color-neutral-3);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ui-subview-btn.active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ui-subview-btn:hover:not(.active) {
+  color: var(--color-primary);
+}
+
+/* Mode indicator bar */
+.ui-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #f7f9fa;
+  border: 1px solid var(--color-agent-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.ui-mode-bar-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-right: 2px;
+}
+
+.ui-mode-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--color-neutral-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-neutral-3);
+  font-size: 0.65rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-mode-btn.active {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  border-color: var(--color-primary);
+}
+
+.ui-mode-btn:hover:not(.active):not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.ui-mode-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Create New UI avatar — star/sparkle gradient */
+.ui-chat-avatar--create {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+}
+
+/* Generated theme name badge */
+.ui-generated-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: 0.65rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
 /* ===== REDUCED MOTION ===== */
 @media (prefers-reduced-motion: reduce) {
   .product-carousel {
