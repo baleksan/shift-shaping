@@ -4,6 +4,7 @@
  * Produces a .claude spec file combining:
  * - Shapie shape data (name, problem, participants, slack channel)
  * - Wolfie session config (prompts, search settings, LLM settings)
+ * - Wolfie UI customizations (CSS variable overrides + custom CSS rules)
  * - Shaping session transcript
  *
  * The output is a structured markdown spec that Claude can consume
@@ -80,9 +81,14 @@ export function generateClaudeSpec({ shape, wolfieConfig, messages }) {
     // Search settings
     lines.push('### Search Settings');
     lines.push('');
-    lines.push(`- **Provider:** ${wolfieConfig.searchProvider || 'cimulate'}`);
-    if (wolfieConfig.catalog) {
-      lines.push(`- **Catalog:** ${wolfieConfig.catalog}`);
+    const searchProvider = wolfieConfig.searchProvider || 'cimulate';
+    const searchCatalog = wolfieConfig.searchCatalog || wolfieConfig.catalog || '';
+    lines.push(`- **Provider:** ${searchProvider}`);
+    if (searchCatalog) {
+      lines.push(`- **Catalog:** ${searchCatalog}`);
+    }
+    if (wolfieConfig.maxResults) {
+      lines.push(`- **Max Results:** ${wolfieConfig.maxResults}`);
     }
     lines.push('');
 
@@ -113,6 +119,39 @@ export function generateClaudeSpec({ shape, wolfieConfig, messages }) {
       lines.push(template);
       lines.push('```');
       lines.push('');
+    }
+
+    // UI Customizations
+    const uiCustomizations = wolfieConfig.uiCustomizations || {};
+    const uiCustomCSS = wolfieConfig.uiCustomCSS || '';
+    const hasVarOverrides = Object.keys(uiCustomizations).length > 0;
+    const hasCSSRules = uiCustomCSS.trim().length > 0;
+
+    if (hasVarOverrides || hasCSSRules) {
+      lines.push('### UI Customizations');
+      lines.push('');
+      lines.push('_The following UI changes were applied via the "Change UI" chat in Wolfie._');
+      lines.push('');
+
+      if (hasVarOverrides) {
+        lines.push('#### CSS Variable Overrides');
+        lines.push('');
+        lines.push('| Variable | Value |');
+        lines.push('|----------|-------|');
+        for (const [varName, value] of Object.entries(uiCustomizations)) {
+          lines.push(`| \`${varName}\` | \`${value}\` |`);
+        }
+        lines.push('');
+      }
+
+      if (hasCSSRules) {
+        lines.push('#### Custom CSS Rules');
+        lines.push('');
+        lines.push('```css');
+        lines.push(uiCustomCSS.trim());
+        lines.push('```');
+        lines.push('');
+      }
     }
   } else {
     lines.push('_Wolfie configuration not available. Using defaults._');
