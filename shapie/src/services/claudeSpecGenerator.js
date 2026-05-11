@@ -237,6 +237,21 @@ export function generateClaudeSpec({ shape, wolfieConfig, messages }) {
     }
   }
 
+  // ---- Changes from Defaults ----
+  if (wolfieConfig) {
+    const changes = collectChangesFromDefaults(wolfieConfig);
+    if (changes.length > 0) {
+      lines.push('## Changes from Defaults');
+      lines.push('');
+      lines.push('_Summary of all Wolfie configuration changes relative to out-of-the-box defaults._');
+      lines.push('');
+      for (const change of changes) {
+        lines.push(`- **${change.category}** — ${change.description}`);
+      }
+      lines.push('');
+    }
+  }
+
   // ---- Footer ----
   lines.push('---');
   lines.push('');
@@ -266,6 +281,114 @@ export function downloadClaudeSpec(params, filename) {
   URL.revokeObjectURL(url);
 
   return content;
+}
+
+/**
+ * Default Wolfie configuration values.
+ * Used to detect what the user changed from out-of-the-box settings.
+ */
+const WOLFIE_DEFAULTS = {
+  searchProvider: 'cimulate',
+  searchCatalog: 'cephora',
+  maxResults: 8,
+  llmModel: 'gpt-4o-mini',
+  llmApiUrl: null,
+};
+
+/**
+ * Collect a list of human-readable changes from default Wolfie configuration.
+ *
+ * @param {object} wolfieConfig
+ * @returns {Array<{category: string, description: string}>}
+ */
+function collectChangesFromDefaults(wolfieConfig) {
+  const changes = [];
+
+  // Search settings
+  const provider = wolfieConfig.searchProvider || WOLFIE_DEFAULTS.searchProvider;
+  if (provider !== WOLFIE_DEFAULTS.searchProvider) {
+    changes.push({
+      category: 'Search Provider',
+      description: `Changed from \`${WOLFIE_DEFAULTS.searchProvider}\` to \`${provider}\``,
+    });
+  }
+
+  const catalog = wolfieConfig.searchCatalog || wolfieConfig.catalog || WOLFIE_DEFAULTS.searchCatalog;
+  if (catalog !== WOLFIE_DEFAULTS.searchCatalog) {
+    changes.push({
+      category: 'Search Catalog',
+      description: `Changed from \`${WOLFIE_DEFAULTS.searchCatalog}\` to \`${catalog}\``,
+    });
+  }
+
+  const maxResults = wolfieConfig.maxResults || WOLFIE_DEFAULTS.maxResults;
+  if (maxResults !== WOLFIE_DEFAULTS.maxResults) {
+    changes.push({
+      category: 'Max Results',
+      description: `Changed from \`${WOLFIE_DEFAULTS.maxResults}\` to \`${maxResults}\``,
+    });
+  }
+
+  // LLM settings
+  const model = wolfieConfig.llmModel || WOLFIE_DEFAULTS.llmModel;
+  if (model !== WOLFIE_DEFAULTS.llmModel) {
+    changes.push({
+      category: 'LLM Model',
+      description: `Changed from \`${WOLFIE_DEFAULTS.llmModel}\` to \`${model}\``,
+    });
+  }
+
+  if (wolfieConfig.llmApiUrl && wolfieConfig.llmApiUrl !== WOLFIE_DEFAULTS.llmApiUrl) {
+    changes.push({
+      category: 'LLM API URL',
+      description: `Custom endpoint: \`${wolfieConfig.llmApiUrl}\``,
+    });
+  }
+
+  // Prompt customizations
+  const prompts = wolfieConfig.prompts || {};
+  const promptLabels = {
+    explanation: 'Explanation Prompt',
+    bestPick: 'Best Pick Prompt',
+    reformulations: 'Reformulations Prompt',
+  };
+
+  for (const [key, label] of Object.entries(promptLabels)) {
+    if (prompts[key] && prompts[key] !== DEFAULT_WOLFIE_PROMPTS[key]) {
+      // Show a short preview of what changed
+      const preview = prompts[key].length > 80
+        ? prompts[key].slice(0, 80).replace(/\n/g, ' ') + '...'
+        : prompts[key].replace(/\n/g, ' ');
+      changes.push({
+        category: label,
+        description: `Customized (starts with: "${preview}")`,
+      });
+    }
+  }
+
+  // UI Customizations — CSS variable overrides
+  const uiCustomizations = wolfieConfig.uiCustomizations || {};
+  const varOverrideCount = Object.keys(uiCustomizations).length;
+  if (varOverrideCount > 0) {
+    const varNames = Object.keys(uiCustomizations).map((v) => `\`${v}\``).join(', ');
+    changes.push({
+      category: 'UI Variables',
+      description: `${varOverrideCount} CSS variable${varOverrideCount > 1 ? 's' : ''} overridden: ${varNames}`,
+    });
+  }
+
+  // UI Customizations — custom CSS rules
+  const uiCustomCSS = (wolfieConfig.uiCustomCSS || '').trim();
+  if (uiCustomCSS.length > 0) {
+    // Count the number of rule blocks
+    const ruleCount = (uiCustomCSS.match(/\{/g) || []).length;
+    changes.push({
+      category: 'UI Custom CSS',
+      description: `${ruleCount} custom CSS rule${ruleCount !== 1 ? 's' : ''} injected`,
+    });
+  }
+
+  return changes;
 }
 
 function slugify(text) {

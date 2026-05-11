@@ -17,10 +17,19 @@ const WOLFIE_STORAGE_KEY = 'shopperAgentConfig';
  *
  * @param {number} port - Wolfie port (default 3099)
  * @param {number} timeout - Max wait in ms (default 3000)
+ * @param {object} [options]
+ * @param {boolean} [options.fresh=false] - Skip proxy cache and always
+ *   read directly from Wolfie's localStorage via iframe bridge. Use this
+ *   when you need the latest config (e.g. after the user edits prompts).
  * @returns {Promise<object|null>} Wolfie config or null
  */
-export async function fetchWolfieConfig(port = 3099, timeout = 3000) {
+export async function fetchWolfieConfig(port = 3099, timeout = 3000, { fresh = false } = {}) {
   const wolfieOrigin = `http://localhost:${port}`;
+
+  // When fresh is requested, skip the server-side cache entirely
+  if (fresh) {
+    return fetchViaIframe(wolfieOrigin, timeout);
+  }
 
   return new Promise((resolve) => {
     // Try fetching from our proxy cache first

@@ -69,7 +69,7 @@ export default function ShapingSession({ shape, config, onUpdateShape, onViewRep
     try {
       // Fetch Wolfie's current config (prompts, search, LLM settings)
       const wolfiePort = config.wolfiePort || 3099;
-      const wolfieConfig = await fetchWolfieConfig(wolfiePort, 4000);
+      const wolfieConfig = await fetchWolfieConfig(wolfiePort, 4000, { fresh: true });
 
       // Generate and download the .claude.md spec file
       const spec = downloadClaudeSpec({

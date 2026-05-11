@@ -216,7 +216,7 @@ export default function ReportPreview({ shape, config, onUpdateShape }) {
     const savedRecordings = [...recordings];
     try {
       const wolfiePort = config.wolfiePort || 3099;
-      const wolfieConfig = await fetchWolfieConfig(wolfiePort, 4000);
+      const wolfieConfig = await fetchWolfieConfig(wolfiePort, 4000, { fresh: true });
       const spec = generateClaudeSpec({
         shape,
         wolfieConfig,
