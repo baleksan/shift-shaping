@@ -21,6 +21,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Recordings (large binary files)
+.recordings/
+
 # Debug logs
 npm-debug.log*
 yarn-debug.log*

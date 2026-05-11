@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import WerewolfIcon from './WerewolfIcon';
 import WolfiePopover from './WolfiePopover';
+import ScreenRecorder from './ScreenRecorder';
 
 export default function CommerceHeader({ title, onMinimize, onEndChat, onSettings }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -70,6 +71,32 @@ export default function CommerceHeader({ title, onMinimize, onEndChat, onSetting
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+        {/* Shapie tools — only shown when opened from Shapie */}
+        {(() => {
+          const params = new URLSearchParams(window.location.search);
+          const shapieId = params.get('shapie');
+          if (!shapieId) return null;
+          const shapieUrl = `http://localhost:3100`;
+          return (
+            <>
+              <ScreenRecorder shapeId={shapieId} shapieOrigin={shapieUrl} />
+              <button
+                className="header-button shapie-back-button"
+                onClick={() => window.open(shapieUrl, '_blank')}
+                aria-label="Back to Shapie"
+                title="Back to Shapie"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8A040" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="8" r="5" />
+                  <path d="M3 21c0-4.97 4.03-9 9-9s9 4.03 9 9" />
+                  <circle cx="9" cy="7" r="0.8" fill="#E8A040" stroke="none" />
+                  <circle cx="15" cy="7" r="0.8" fill="#E8A040" stroke="none" />
+                  <path d="M9.5 9.5Q12 11 14.5 9.5" strokeWidth="1.5" />
+                </svg>
+              </button>
+            </>
+          );
+        })()}
         {onSettings && (
           <button
             className="header-button"
