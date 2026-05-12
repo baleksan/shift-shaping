@@ -71,12 +71,20 @@ export default function ShapeEditor({ shape, onUpdate, onStartSession, onViewRep
 
       {/* Actions bar */}
       <div className="editor-actions">
-        <button className="btn btn-primary" onClick={onStartSession}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-          </svg>
-          Start Shaping Session
-        </button>
+        {(() => {
+          const isStarted = form.status && form.status !== 'raw_idea';
+          return (
+            <button
+              className={`btn ${isStarted ? 'btn-session-active' : 'btn-primary'}`}
+              onClick={onStartSession}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+              </svg>
+              {isStarted ? 'Shaping Session' : 'Start Shaping Session'}
+            </button>
+          );
+        })()}
         {shape.report && (
           <button className="btn btn-secondary" onClick={onViewReport}>
             View Report

@@ -419,6 +419,16 @@ body {
   border-color: #b0afab;
 }
 
+.btn-session-active {
+  background: #22c55e;
+  color: #fff;
+}
+
+.btn-session-active:hover:not(:disabled) {
+  background: #16a34a;
+  transform: translateY(-1px);
+}
+
 .btn-danger {
   background: #f87171;
   color: #fff;
