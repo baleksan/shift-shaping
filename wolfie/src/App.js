@@ -59,24 +59,41 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Apply persisted UI customizations on mount
+  // Apply persisted UI customizations on mount — mode-aware
   useEffect(() => {
-    if (config.uiCustomizations && typeof config.uiCustomizations === 'object') {
-      const root = document.documentElement;
-      for (const [varName, value] of Object.entries(config.uiCustomizations)) {
-        root.style.setProperty(varName, value);
-      }
-    }
-    if (config.uiCustomCSS) {
-      const DYNAMIC_STYLE_ID = 'wolfie-ui-customizations';
-      let styleEl = document.getElementById(DYNAMIC_STYLE_ID);
+    const mode = config.uiMode || (config.uiGeneratedCSS ? 'generated' :
+      ((config.uiCustomizations && Object.keys(config.uiCustomizations).length > 0) || config.uiCustomCSS) ? 'tweaked' : 'original');
+
+    if (mode === 'generated' && config.uiGeneratedCSS) {
+      // Apply full generated stylesheet
+      const GENERATED_STYLE_ID = 'wolfie-ui-generated';
+      let styleEl = document.getElementById(GENERATED_STYLE_ID);
       if (!styleEl) {
         styleEl = document.createElement('style');
-        styleEl.id = DYNAMIC_STYLE_ID;
+        styleEl.id = GENERATED_STYLE_ID;
         document.head.appendChild(styleEl);
       }
-      styleEl.textContent = config.uiCustomCSS;
+      styleEl.textContent = config.uiGeneratedCSS;
+    } else if (mode === 'tweaked') {
+      // Apply incremental tweaks
+      if (config.uiCustomizations && typeof config.uiCustomizations === 'object') {
+        const root = document.documentElement;
+        for (const [varName, value] of Object.entries(config.uiCustomizations)) {
+          root.style.setProperty(varName, value);
+        }
+      }
+      if (config.uiCustomCSS) {
+        const DYNAMIC_STYLE_ID = 'wolfie-ui-customizations';
+        let styleEl = document.getElementById(DYNAMIC_STYLE_ID);
+        if (!styleEl) {
+          styleEl = document.createElement('style');
+          styleEl.id = DYNAMIC_STYLE_ID;
+          document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = config.uiCustomCSS;
+      }
     }
+    // 'original' — nothing to apply
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist config
